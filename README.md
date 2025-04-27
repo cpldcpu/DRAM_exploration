@@ -1,0 +1,124 @@
+# 4164-20 DRAM Interface for CH32V003
+
+This project demonstrates how to interface a 4164-20 DRAM chip (64K x 1 bit) with a CH32V003 microcontroller using the CH32V003fun environment.
+
+## Overview
+
+The 4164 is a classic 64K x 1 bit DRAM chip that was widely used in the 1980s. This project shows how to:
+- Connect the DRAM to a modern microcontroller (CH32V003)
+- Initialize the DRAM
+- Implement read and write operations
+- Properly handle refresh cycles required by dynamic RAM
+
+## Hardware Requirements
+
+- CH32V003 microcontroller (e.g., CH32V003F4P6)
+- 4164-20 DRAM chip (TI, Micron, or compatible)
+- Breadboard and jumper wires
+- USB-to-Serial adapter for debugging output
+- 5V power supply
+
+## Pin Connections
+
+| 4164 DRAM Pin | Function | CH32V003 Pin |
+|---------------|----------|--------------|
+| 1             | NC       | -            |
+| 2             | DIN      | PD0          |
+| 3             | W/R      | PD4          |
+| 4             | RAS      | PD3          |
+| 5-13          | A0-A7    | PC0-PC7      |
+| 8             | VCC      | 5V supply    |
+| 14            | DOUT     | PD5          |
+| 15            | CAS      | PD2          |
+| 16            | GND      | GND          |
+
+## Wiring Diagram
+
+```
+                    CH32V003                            4164 DRAM
+                  +-----------+                      +------------+
+                  |           |                      |            |
+         GND -----| GND       |                      | GND (16)   |
+         5V  -----| VCC       |                      | VCC (8)    |
+                  |           |                      |            |
+                  |       PC0 |------+-----------+---| A0 (5)     |
+                  |       PC1 |------+-----------+---| A1 (7)     |
+                  |       PC2 |------+-----------+---| A2 (6)     |
+                  |       PC3 |------+-----------+---| A3 (12)    |
+Address Bus       |       PC4 |------+-----------+---| A4 (11)    |
+                  |       PC5 |------+-----------+---| A5 (10)    |
+                  |       PC6 |------+-----------+---| A6 (13)    |
+                  |       PC7 |------+-----------+---| A7 (9)     |
+                  |           |      |           |   |            |
+                  |       PD0 |------+-----------+---| DIN (2)    |
+                  |       PD2 |------+-----------+---| CAS (15)   |
+                  |       PD3 |------+-----------+---| RAS (4)    |
+                  |       PD4 |------+-----------+---| W/R (3)    |
+                  |       PD5 |------+-----------+---| DOUT (14)  |
+                  |           |                      |            |
+                  +-----------+                      +------------+
+                                                     | NC (1)     |
+                                                     +------------+
+```
+
+## Software Architecture
+
+The software is structured as follows:
+
+- **src/dram.h**: Header file defining DRAM interface functions and pin configurations
+- **src/dram.c**: Implementation of the DRAM interface functions
+- **src/main.c**: Main application that demonstrates DRAM operation
+- **src/ch32v003fun/**: Submodule containing the CH32V003fun framework
+
+Key functions:
+- `dram_init()`: Initialize DRAM interface
+- `dram_write(row, col, data)`: Write a bit to DRAM
+- `dram_read(row, col)`: Read a bit from DRAM
+- `dram_refresh()`: Perform a complete refresh cycle
+
+## DRAM Timing
+
+The 4164-20 has a 200ns access time. Critical timing parameters:
+- tRAS: Row Address Setup (min 100ns)
+- tCAS: Column Address Setup (min 100ns)
+- tRCD: RAS to CAS Delay (min 20ns)
+- tRP: RAS Precharge Time (min 100ns)
+- All 256 rows must be refreshed within 4ms
+
+## Build and Flash
+
+First, initialize the CH32V003fun submodule in the src directory:
+```
+mkdir -p src
+git init
+git submodule add https://github.com/cnlohr/ch32v003fun.git src/ch32v003fun
+```
+
+To build the project:
+```
+make
+```
+
+To flash to the CH32V003:
+```
+make flash
+```
+
+## Debugging
+
+The code outputs debug information via UART at 115200 baud. Connect a serial terminal to see:
+- Initialization status
+- Test results
+- Error messages
+
+## Notes
+
+- The DRAM requires continuous refreshing to maintain data
+- The CH32V003 runs at 48MHz (1 cycle = ~20.83ns), much faster than the DRAM
+- Careful timing is required for reliable operation
+
+## References
+
+- [4164 DRAM Datasheet](https://www.datasheetarchive.com/TMS4164-datasheet.html)
+- [CH32V003 Datasheet](https://www.wch.cn/downloads/CH32V003DS0_PDF.html)
+- [CH32V003fun GitHub](https://github.com/cnlohr/ch32v003fun)
