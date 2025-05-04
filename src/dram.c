@@ -47,9 +47,11 @@ void dram_init(void) {
     GPIOD->CFGLR |= (0x4 << (4 * 5)); // Input with pull-up/down
     
     // Set initial pin states
-    GPIOD->BSHR = DRAM_CAS_PIN | DRAM_RAS_PIN; // Set CAS and RAS high (inactive)
+    GPIOD->BSHR = DRAM_CAS_PIN ; // Set CAS high (inactive)
     GPIOD->BSHR = DRAM_WR_PIN;                 // Set W/R high (read mode)
     
+    GPIOC->BSHR = DRAM_RAS_PIN; // Set RAS high (inactive)
+
     printf("DRAM pins configured\r\n");
     
 }
@@ -67,18 +69,18 @@ void dram_write(uint8_t row, uint8_t col, uint8_t data) {
     }
     
     // Set row address
-    DRAM_ADDR_PORT->OUTDR = row;
-    GPIOD->BCR = DRAM_RAS_PIN;  // RAS low (active)
+    DRAM_ADDR_PORT->OUTDR = row | 0x80;  // RAS Hi
+    GPIOC->BCR = DRAM_RAS_PIN;  // RAS low (active)
     DELAY_RCD_CYCLES();        // RAS to CAS delay
     
     // Set column address
-    DRAM_ADDR_PORT->OUTDR = col;
+    DRAM_ADDR_PORT->OUTDR = col & 0x7f;  // RAS low
     GPIOD->BCR = DRAM_CAS_PIN;  // CAS low (active)
     DELAY_CAS_CYCLES();        // CAS pulse width
     
     // End cycle
     GPIOD->BSHR = DRAM_CAS_PIN; // CAS high (inactive)
-    GPIOD->BSHR = DRAM_RAS_PIN; // RAS high (inactive)
+    GPIOC->BSHR = DRAM_RAS_PIN; // RAS high (inactive)
     GPIOD->BSHR = DRAM_WR_PIN;  // W/R high (read mode)
     DELAY_RP_CYCLES();         // RAS precharge time
 }
@@ -99,15 +101,15 @@ uint8_t dram_read(uint8_t row, uint8_t col) {
     GPIOD->BSHR = DRAM_WR_PIN;  // W/R high (read mode)
     
     // Set row address
-    DRAM_ADDR_PORT->OUTDR = row;
+    DRAM_ADDR_PORT->OUTDR = row | 0x80;  // RAS Hi
     DELAY_2_CYCLES(); // Delay for address setup time    
-    GPIOD->BCR = DRAM_RAS_PIN;  // RAS low (active)    
+    GPIOC->BCR = DRAM_RAS_PIN;  // RAS low (active)    
     DELAY_RCD_CYCLES();        // RAS to CAS delay
  
     // GPIOD->BSHR = DRAM_DOUT_PIN;  // W/R high (read mode)
    
     // Set column address
-    DRAM_ADDR_PORT->OUTDR = col;
+    DRAM_ADDR_PORT->OUTDR = col & 0x7f;  // RAS low
     GPIOD->BCR = DRAM_CAS_PIN;  // CAS low (active)
     DELAY_CAS_CYCLES();        // CAS pulse width
     
@@ -116,7 +118,7 @@ uint8_t dram_read(uint8_t row, uint8_t col) {
     
     // End cycle
     GPIOD->BSHR = DRAM_CAS_PIN; // CAS high (inactive)
-    GPIOD->BSHR = DRAM_RAS_PIN; // RAS high (inactive)
+    GPIOC->BSHR = DRAM_RAS_PIN; // RAS high (inactive)
     DELAY_RP_CYCLES();         // RAS precharge time
     
     return data;
@@ -224,16 +226,16 @@ void dram_refresh_row(uint8_t row) __attribute__((section(".srodata"))) __attrib
 // Refresh a single row
 void dram_refresh_row(uint8_t row) {
     // RAS-only refresh cycle
-    DRAM_ADDR_PORT->OUTDR = row;  // Set row address
-    GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+    DRAM_ADDR_PORT->OUTDR = row & 0x7f;  // Set row address, RAW=LO
+    GPIOC->BCR = DRAM_RAS_PIN;    // RAS low (active)
     DELAY_RAS_CYCLES();          // RAS pulse width    
     // DELAY_RAS_CYCLES();          // RAS pulse width
-    GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+    GPIOC->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
     DELAY_RP_CYCLES();           // RAS precharge time
 }
 
 
-void dram_glitch_row(uint8_t row) __attribute__((section(".srodata"))) __attribute__((used));
+// void dram_glitch_row(uint8_t row) __attribute__((section(".srodata"))) __attribute__((used));
 
 // Refresh a single row
 void dram_glitch_row(uint8_t row) {
@@ -286,54 +288,116 @@ void dram_glitch_refresh(uint8_t row,int32_t reps) {
     }
 }
 
+
+void dram_majority(uint8_t row1, uint8_t row2, uint8_t row3,int32_t reps) __attribute__((section(".srodata"))) __attribute__((used));
+
+void dram_majority(uint8_t row1, uint8_t row2,uint8_t row3,int32_t reps) {
+    // RAS-only refresh cycle
+    GPIOC->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+    GPIOD->BSHR = DRAM_CAS_PIN;   // CAS high (inactive)
+    DELAY_RP_CYCLES();           // RAS precharge time
+
+    row1 = row1 | 0x80; // Set RAS high
+    // row2 = row2 & 0x7f; // Set RAS low
+    row2 = row2 | 0x80; // Set RAS High
+    row2 = row3 | 0x80; // Set RAS High
+ 
+    for (int32_t i=0; i<reps; i++) {
+        dram_refresh_row(row1); // Refresh row 1 befire AND op to ensure stable levels
+        dram_refresh_row(row2); // Refresh row 2
+        dram_refresh_row(row3); // Refresh row 2
+        // dram_refresh_row(row2); // Refresh row 2
+
+        DRAM_ADDR_PORT->OUTDR = row1;  // Set row1 address, RAS=Hi
+        DELAY_RP_CYCLES();           // RAS precharge time
+        GPIOC->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        // DELAY_3_CYCLES();          // RAS pulse width
+        // DRAM_ADDR_PORT->OUTDR = row2;  // Set row2 address, RAS=Lo
+        // DELAY_3_CYCLES();          // RAS pulse width
+        DRAM_ADDR_PORT->OUTDR = row2;  // Set row2 address, RAS=Hi
+        // GPIOC->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+        // DELAY_1_CYCLES();          // RAS pulse width
+        GPIOC->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        DRAM_ADDR_PORT->OUTDR = row3;  // Set row3 address, RAS=Hi
+        GPIOC->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        DELAY_RAS_CYCLES();          // RAS pulse width    
+        GPIOC->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+        DELAY_RP_CYCLES();           // RAS precharge time
+    }
+}
+
+
 void dram_glitch_read(uint8_t row1, uint8_t row2, int32_t reps) __attribute__((section(".srodata"))) __attribute__((used));
 
 // Refresh a single row
 void dram_glitch_read(uint8_t row1, uint8_t row2,int32_t reps) {
     // RAS-only refresh cycle
-    GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+    GPIOC->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
     GPIOD->BSHR = DRAM_CAS_PIN;   // CAS high (inactive)
     DELAY_RP_CYCLES();           // RAS precharge time
 
+    row1 = row1 | 0x80; // Set RAS high
+    // row2 = row2 & 0x7f; // Set RAS low
+    row2 = row2 | 0x80; // Set RAS High
  
     for (int32_t i=0; i<reps; i++) {
-        DRAM_ADDR_PORT->OUTDR = row1;  // Set row1 address
+        dram_refresh_row(row1); // Refresh row 1 befire AND op to ensure stable levels
+        dram_refresh_row(row2); // Refresh row 2
+        // dram_refresh_row(row2); // Refresh row 2
+
+        DRAM_ADDR_PORT->OUTDR = row1;  // Set row1 address, RAS=Hi
         DELAY_RP_CYCLES();           // RAS precharge time
-        GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
-        DELAY_3_CYCLES();          // RAS pulse width
-        DRAM_ADDR_PORT->OUTDR = row2;  // Set row2 address
-        DELAY_3_CYCLES();          // RAS pulse width
-        GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+        GPIOC->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        // DELAY_3_CYCLES();          // RAS pulse width
+        // DRAM_ADDR_PORT->OUTDR = row2;  // Set row2 address, RAS=Lo
+        // DELAY_3_CYCLES();          // RAS pulse width
+        DRAM_ADDR_PORT->OUTDR = row2;  // Set row2 address, RAS=Lo
+        // GPIOC->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
         // DELAY_1_CYCLES();          // RAS pulse width
-        GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        GPIOC->BCR = DRAM_RAS_PIN;    // RAS low (active)
         DELAY_RAS_CYCLES();          // RAS pulse width    
-        GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+        GPIOC->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
         DELAY_RP_CYCLES();           // RAS precharge time
     }
 }
 
+// Behavior is extremely dependent on VDD and refresh timing
+
+// row 0 and 1 (positive)
+
+// Row 00: 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 5A 
+// Row 01: FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 FF 00 
+
+// cycle: 1
+// Row 00: FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF FF 
+// Row 01: 5E 5A 5E 5A 7F 5A 7F 5A 7E 5A 7E 5A 7F 5A 7F 5A 5E 5A 5E 5A 7F 5A 7F 5A 7E 5A 7E 5A 7F 5A 7F 5A 
+// Row 01: 5E 5A 5E 5A 7F 5A 7F 5A 7E 5A 7E 5A 7F 5A 7F 5A 5E 5A 5E 5A 7F 5A 7F 5A 7E 5A 7E 5A 7F 5A 7F 5A
+// Row 01: 5E 5A 5E 5A 7F 5A 7F 5A FE 5A FE 5A 7F 5A 7F 5A 5E 5A 5E 5A 7F 5A 7F 5A FE 5A FE 5A 7F 5A 7F 5A 
+// Row 01: 5E 5A 5E 5A 7F 5A 7F 5A FE 5A FE 5A 7F 5A 7F 5A 5E 5A 5E 5A 7F 5A 7F 5A FE 5A FE 5A 7F 5A 7F 5A 
 
 // copies row by latching new row address before the refresh cycle is terminated
 void dram_glitch_read_test(void) {
     // Test RAS refresh functionality
-    uint8_t row1 = 64,row2 = 65;
+    uint8_t row1 = 00,row2 = 01, row3 = 02;
 
     printf("Starting DRAM test: read glitch\r\n");
 
     dram_readpages(row1,1);
     dram_readpages(row2,1);
+    dram_readpages(row3,1);
 
     for (int32_t i=0; i<4; i++) {
         printf("cycle: %ld\n",i);
-        dram_write_page(row1, 0x5A5A5A5A); // Write a pattern to each page (row number)
-        dram_write_page(row2, 0x00FF00FF); // Write a pattern to each page (row number)
-        dram_glitch_read(row1,row2,i);
+        dram_write_page(row1, 0x000F00FF); // Write a pattern to each page (row number)
+        dram_write_page(row2, 0x5A5A5A5A); // Write a pattern to each page (row number)
+        dram_write_page(row3, 0x00FF00FF); // Write a pattern to each page (row number)
+        // dram_glitch_read(row1,row2,i);
+        dram_majority(row1,row2,row3,i);
         dram_readpages(row1,1);
         dram_readpages(row2,1);
+        dram_readpages(row3,1);
     }
 }
-
-
 
 void dram_glitch_refresh_test(void) {
     // Test RAS refresh functionality
@@ -351,10 +415,7 @@ void dram_glitch_refresh_test(void) {
         dram_readpages(row1,1);
         dram_readpages(row2,1);
     }
-
 }
-
-
 
 void dram_test(void) {
     // Test writing and reading from DRAM
@@ -388,7 +449,7 @@ void dram_readpages(uint8_t startrow,uint8_t rows) {
     uint8_t current_byte;
     uint8_t bit_index;
 
-    printf("Starting DRAM test: Reading first 16 pages (Rows 0-15)\r\n");
+    // printf("Starting DRAM test: Reading first 16 pages (Rows 0-15)\r\n");
 
     // Loop through the first 16 rows
     for (uint8_t row = startrow; row < startrow+rows; row++) {

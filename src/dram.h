@@ -11,9 +11,14 @@
 // Control pins on PORT D
 #define DRAM_DIN_PIN  GPIO_Pin_0  // PD0 for Data In
 #define DRAM_CAS_PIN  GPIO_Pin_2  // PD2 for Column Address Strobe
-#define DRAM_RAS_PIN  GPIO_Pin_3  // PD3 for Row Address Strobe
+// #define DRAM_RAS_PIN  GPIO_Pin_3  // PD3 for Row Address Strobe
 #define DRAM_WR_PIN   GPIO_Pin_4  // PD4 for Write/Read control
 #define DRAM_DOUT_PIN GPIO_Pin_5  // PD5 for Data Out
+
+#define DRAM_RAS_PIN  GPIO_Pin_7  // PC7 for Row Address Strobe
+
+void dram_glitch_row(uint8_t row) __attribute__((section(".srodata"))) __attribute__((used));
+
 
 // Function prototypes
 void dram_init(void);

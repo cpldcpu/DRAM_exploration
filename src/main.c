@@ -78,14 +78,15 @@ int main(void) {
     dram_init();
     
     // copy row
-    // dram_glitch_read_test();
+    dram_glitch_read_test();
 
     // delete row by aborting refresh
-    dram_glitch_refresh_test();
+    // dram_glitch_refresh_test();
     // dram_exercise_RAS();
 
     // Run DRAM test
     // dram_readpages(0,255);
+    // dram_readpages(0,15);
 
     // dram_test();
     // dram_exercise_RAS();
