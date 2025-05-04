@@ -21,7 +21,10 @@ void dram_write(uint8_t row, uint8_t col, uint8_t data);
 uint8_t dram_read(uint8_t row, uint8_t col);
 void dram_refresh_row(uint8_t row);
 void dram_test(void);
-void dram_readpages(uint8_t pages);
+void dram_readpages(uint8_t startpage, uint8_t pages);
 void dram_exercise_RAS(void);
+void dram_glitch_refresh_test(void);
+void dram_glitch_read_test(void);
+
 
 #endif // DRAM_H

@@ -52,13 +52,6 @@ void dram_init(void) {
     
     printf("DRAM pins configured\r\n");
     
-    // // Perform initial refresh for all rows
-    // printf("Performing initial refresh...\r\n");
-    // for (uint16_t row = 0; row < 256; row++) {
-    //     dram_refresh_row(row);
-    // }
-    
-    // printf("DRAM initialized\r\n");
 }
 
 // Write a bit to DRAM
@@ -131,7 +124,6 @@ uint8_t dram_read(uint8_t row, uint8_t col) {
 
 
 void dram_copyrow(uint8_t, uint8_t,uint8_t) __attribute__((section(".srodata"))) __attribute__((used));
-
 
 // Read a bit from DRAM
 void dram_copyrow(uint8_t row1, uint8_t row2, uint8_t delay) {    
@@ -234,11 +226,33 @@ void dram_refresh_row(uint8_t row) {
     // RAS-only refresh cycle
     DRAM_ADDR_PORT->OUTDR = row;  // Set row address
     GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
-    DELAY_RAS_CYCLES();          // RAS pulse width
+    DELAY_RAS_CYCLES();          // RAS pulse width    
+    // DELAY_RAS_CYCLES();          // RAS pulse width
     GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
     DELAY_RP_CYCLES();           // RAS precharge time
 }
 
+
+void dram_glitch_row(uint8_t row) __attribute__((section(".srodata"))) __attribute__((used));
+
+// Refresh a single row
+void dram_glitch_row(uint8_t row) {
+    // RAS-only refresh cycle
+    DRAM_ADDR_PORT->OUTDR = row;  // Set row address
+    GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+    DELAY_RAS_CYCLES();          // RAS pulse width    
+    DELAY_RAS_CYCLES();          // RAS pulse width
+    GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+    GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+    DELAY_RAS_CYCLES();          // RAS pulse width    
+    DELAY_RAS_CYCLES();          // RAS pulse width
+    GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+    DELAY_RP_CYCLES();           // RAS precharge time
+    DELAY_RP_CYCLES();           // RAS precharge time
+    DELAY_RP_CYCLES();           // RAS precharge time
+    GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+    GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+}
 
 void dram_exercise_RAS(void) {
     // Test RAS refresh functionality
@@ -249,19 +263,104 @@ void dram_exercise_RAS(void) {
 
     while(1) {
         dram_refresh_row(0); // Refresh row 0
-        dram_refresh_row(2); // Refresh row 2
+        dram_glitch_row(0); // Refresh row 2
 
         Delay_Us(10);
     }
-    
+}
+
+void dram_glitch_refresh(uint8_t row,int32_t reps) __attribute__((section(".srodata"))) __attribute__((used));
+
+// Refresh a single row
+void dram_glitch_refresh(uint8_t row,int32_t reps) {
+    // RAS-only refresh cycle
+    GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+    GPIOD->BSHR = DRAM_CAS_PIN;   // CAS high (inactive)
+    DRAM_ADDR_PORT->OUTDR = row;  // Set row address
+
+    for (int32_t i=0; i<reps; i++) {
+        GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        // DELAY_3_CYCLES();          // RAS pulse width
+        GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+        DELAY_RP_CYCLES();           // RAS precharge time
+    }
+}
+
+void dram_glitch_read(uint8_t row1, uint8_t row2, int32_t reps) __attribute__((section(".srodata"))) __attribute__((used));
+
+// Refresh a single row
+void dram_glitch_read(uint8_t row1, uint8_t row2,int32_t reps) {
+    // RAS-only refresh cycle
+    GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+    GPIOD->BSHR = DRAM_CAS_PIN;   // CAS high (inactive)
+    DELAY_RP_CYCLES();           // RAS precharge time
+
+ 
+    for (int32_t i=0; i<reps; i++) {
+        DRAM_ADDR_PORT->OUTDR = row1;  // Set row1 address
+        DELAY_RP_CYCLES();           // RAS precharge time
+        GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        DELAY_3_CYCLES();          // RAS pulse width
+        DRAM_ADDR_PORT->OUTDR = row2;  // Set row2 address
+        DELAY_3_CYCLES();          // RAS pulse width
+        GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+        // DELAY_1_CYCLES();          // RAS pulse width
+        GPIOD->BCR = DRAM_RAS_PIN;    // RAS low (active)
+        DELAY_RAS_CYCLES();          // RAS pulse width    
+        GPIOD->BSHR = DRAM_RAS_PIN;   // RAS high (inactive)
+        DELAY_RP_CYCLES();           // RAS precharge time
+    }
+}
+
+
+// copies row by latching new row address before the refresh cycle is terminated
+void dram_glitch_read_test(void) {
+    // Test RAS refresh functionality
+    uint8_t row1 = 64,row2 = 65;
+
+    printf("Starting DRAM test: read glitch\r\n");
+
+    dram_readpages(row1,1);
+    dram_readpages(row2,1);
+
+    for (int32_t i=0; i<4; i++) {
+        printf("cycle: %ld\n",i);
+        dram_write_page(row1, 0x5A5A5A5A); // Write a pattern to each page (row number)
+        dram_write_page(row2, 0x00FF00FF); // Write a pattern to each page (row number)
+        dram_glitch_read(row1,row2,i);
+        dram_readpages(row1,1);
+        dram_readpages(row2,1);
+    }
+}
+
+
+
+void dram_glitch_refresh_test(void) {
+    // Test RAS refresh functionality
+    uint8_t row1 = 0,row2 = 64 ;
+    printf("Starting DRAM test: refresh glitch\r\n");
+    dram_readpages(row1,1);
+    dram_readpages(row2,1);
+
+    for (int32_t i=0; i<8; i++) {
+        printf("cycle: %ld\n",i);
+        dram_write_page(row1, 0x0F550F55); // Write a pattern to each page (row number)
+        dram_write_page(row2, 0x0F550F55); // Write a pattern to each page (row number)
+        dram_glitch_refresh(row1,i);        
+        dram_glitch_refresh(row2,i);        
+        dram_readpages(row1,1);
+        dram_readpages(row2,1);
+    }
 
 }
+
+
 
 void dram_test(void) {
     // Test writing and reading from DRAM
     printf("Starting DRAM test: Writing and reading from first 16 pages (Rows 0-15)\r\n");
 
-    dram_readpages(16);
+    dram_readpages(0,16);
 
     for (uint8_t delay=0; delay < 6; delay++) {
         for (uint8_t row = 0; row <16; row+=4) {
@@ -276,14 +375,14 @@ void dram_test(void) {
         // dram_copyrow_cas(2,3,delay); // Copy row 0 to row 2
         printf("Copying row 1 to row 3. Delay: %d\r\n", delay);
 
-        dram_readpages(4);
+        dram_readpages(0,4);
 
     }
 
 }
 
 // Test DRAM functionality
-void dram_readpages(uint8_t rows) {
+void dram_readpages(uint8_t startrow,uint8_t rows) {
     uint8_t read_val;
     uint8_t page_buffer[32]; // Buffer to hold 256 bits (32 bytes)
     uint8_t current_byte;
@@ -292,7 +391,7 @@ void dram_readpages(uint8_t rows) {
     printf("Starting DRAM test: Reading first 16 pages (Rows 0-15)\r\n");
 
     // Loop through the first 16 rows
-    for (uint8_t row = 0; row < rows; row++) {
+    for (uint8_t row = startrow; row < startrow+rows; row++) {
         current_byte = 0;
         bit_index = 0;
 

@@ -77,13 +77,18 @@ int main(void) {
     // Initialize DRAM
     dram_init();
     
-    // Setup refresh timer
-    // setup_refresh_timer();
-    
-    dram_exercise_RAS();
+    // copy row
+    // dram_glitch_read_test();
+
+    // delete row by aborting refresh
+    dram_glitch_refresh_test();
+    // dram_exercise_RAS();
 
     // Run DRAM test
-    dram_test();
+    // dram_readpages(0,255);
+
+    // dram_test();
+    // dram_exercise_RAS();
 
     
     printf("DRAM test completed\r\n");
@@ -91,9 +96,6 @@ int main(void) {
     
     // Main loop - handle DRAM refresh and any application tasks
     while(1) {
-        // handle_dram_refresh();
-        
-        // Additional application code could go here
         Delay_Ms(100);
     }
     
