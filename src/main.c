@@ -76,12 +76,25 @@ int main(void) {
     
     // Initialize DRAM
     dram_init();
+
+    // Plot the first 16 bits of every page
+    printf("Plotting first 16 bits of every page\r\n");
+    dram_scan_array();
+
+    printf("Writing 0x55AACAFE to row 0, column 0\r\n");
+    dram_write_fpm(0, 0, 0x55aacafe, 32);
+
+    // plot details of the first 8 pages
+    printf("Reading first 8 pages of DRAM\r\n");
+    dram_readpages_fpm(0, 8);
+
+   
     
     // copy row
     // dram_glitch_read_test();
 
     // delete row by aborting refresh
-    dram_glitch_refresh_test();
+    // dram_glitch_refresh_test();
     // dram_exercise_RAS();
 
     // Run DRAM test
