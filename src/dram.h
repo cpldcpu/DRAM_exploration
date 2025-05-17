@@ -17,19 +17,22 @@
 
 // Function prototypes
 void dram_init(void);
+
 void dram_write_bit(uint8_t row, uint8_t col, uint8_t data);
-void dram_write_fpm(uint8_t row, uint8_t col_start, uint32_t data_val, uint8_t bits);
 uint8_t dram_read_bit(uint8_t row, uint8_t col);
+
+void dram_write_fpm(uint8_t row, uint8_t col_start, uint32_t data_val, uint8_t bits);
 uint32_t dram_read_fpm(uint8_t row, uint8_t col, uint8_t bits);
-void dram_refresh_row(uint8_t row);
-void dram_test(void);
+
 void dram_readpages(uint8_t startpage, uint8_t pages);
 void dram_readpages_fpm(uint8_t startrow,uint8_t rows);
-void dram_exercise_RAS(void);
-void dram_glitch_refresh_test(void);
-void dram_glitch_read_test(void);
+
 void dram_scan_array();
 
+void dram_refresh_row(uint8_t row);
 
+void dram_set_row(uint8_t row,int32_t reps);
+
+void dram_copyrow(uint8_t row1, uint8_t row2);
 
 #endif // DRAM_H

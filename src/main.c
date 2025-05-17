@@ -81,28 +81,46 @@ int main(void) {
     printf("Plotting first 16 bits of every page\r\n");
     dram_scan_array();
 
+    // Write test
     printf("Writing 0x55AACAFE to row 0, column 0\r\n");
     dram_write_fpm(0, 0, 0x55aacafe, 32);
-
     // plot details of the first 8 pages
-    printf("Reading first 8 pages of DRAM\r\n");
-    dram_readpages_fpm(0, 8);
+    printf("Reading first row of DRAM\r\n");
+    dram_readpages_fpm(0, 1);
+ 
+    printf("\n\n");
+    printf("------------------------------- Test row setting ------------------------------\n");
+    for (uint32_t i=0; i<3; i++) {
+        printf("\nBefore RAW glitching:\n");
+        dram_write_fpm(0x00, 0, 0x55aacafe, 32);
+        dram_write_fpm(0x40, 0, 0x55aacafe, 32);
+        dram_readpages_fpm(0x00, 1);
+        dram_readpages_fpm(0x40, 1);
+        dram_set_row(0x00, i);
+        dram_set_row(0x40, i);
+        printf("After %ld cycles of RAS glitching:\n",i);
+        dram_readpages_fpm(0x00, 1);
+        dram_readpages_fpm(0x40, 1);
+    }
 
-   
-    
-    // copy row
-    // dram_glitch_read_test();
 
-    // delete row by aborting refresh
-    // dram_glitch_refresh_test();
-    // dram_exercise_RAS();
+    printf("\n\n");
+    printf("------------------------------- Test row copying ------------------------------\n");
 
-    // Run DRAM test
-    // dram_readpages(0,255);
+    uint8_t srcrows[4] = {0x00, 0x00, 0x40, 0x40};
+    uint8_t dstrows[4] = {0x01, 0x40, 0x00, 0x41};
 
-    // dram_test();
-    // dram_exercise_RAS();
-
+    for (uint32_t i=0; i<4; i++) {
+        printf("\nInitializing rows:\n");
+        dram_write_fpm(srcrows[i], 0, 0x55aacafe, 32);
+        dram_write_fpm(dstrows[i], 0, 0x00ff00ff, 32);
+        dram_readpages_fpm(srcrows[i], 1);
+        dram_readpages_fpm(dstrows[i], 1);
+        dram_copyrow(srcrows[i],dstrows[i]);
+        printf("After copying row %d to row %d:\n", srcrows[i], dstrows[i]);
+        dram_readpages_fpm(srcrows[i], 1);
+        dram_readpages_fpm(dstrows[i], 1);
+    }
     
     printf("DRAM test completed\r\n");
     // printf("Entering main loop with continuous DRAM refresh\r\n");
