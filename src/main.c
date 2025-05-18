@@ -123,9 +123,7 @@ int main(void) {
     }
     
     printf("DRAM test completed\r\n");
-    // printf("Entering main loop with continuous DRAM refresh\r\n");
     
-    // Main loop - handle DRAM refresh and any application tasks
     while(1) {
         Delay_Ms(100);
     }
