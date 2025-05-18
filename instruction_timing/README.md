@@ -46,6 +46,14 @@ The plot below shows the instruction timing of the loop vs. number of inserted 1
    <img src="16bitnop.png" alt="16 bit nop" width="70%">
 </p>
 
+First thing to note is that the bare loop without any additional instructions takes 4 cycles to execute in SRAM and 6 cycles in Flash. The CH32V003 uses a QinkeV2 RISC-V2A with a 2 step pipeline and static `branch prediction`. Although not explain further in the processes manual, experimentally this seems to imply that branches are assumed to be not-taken by default. For taken branches, the pipeline is flushed and two additional cycles are added to the execution time. 
+
+Accessing the Flash memory takes 2 additional cycles. It is not clear to me why, as I would have expected only one additional cycles due to the wait state. I am suspecting that it is not possible to abort the prefetch and all flash accesses are timed in steps of two cycles. This is also evident from the fact that the execution time of the loop is the same for 0 and 1 NOPs and 2/3 NOPs. 
+
+Therefore the added penalty for fetching from a new flash address is either 1 or 2 cycles, depending on whether it has completed the last fetch or not.
+
+We see that both for execution from SRAM and Flash, the execution time increases on average by 1 cycle per 16 bit NOP instructions. 
+
 ## 32 Bit NOP
 
 The plot below shows the instruction timing of the loop vs. number of inserted 32 bit NOP instructions. The 32 bit NOP instruction is defined as `mv x0,x0`
@@ -59,6 +67,8 @@ The plot below shows the instruction timing of the loop vs. number of inserted 3
 <p align="center">
    <img src="32bitnop.png" alt="32 bit nop" width="70%">
 </p>
+
+For the 32 bit NOP instruction, we see that the execution time increases on average by 2 cycles per 32 bit NOP instructions for execution from Flash and 1 cycle for execution from SRAM. This is because even with prefetch, the Flash can only provide 32 bits of data every two cycles.
 
 ## 16 Bit Store
 
@@ -74,3 +84,4 @@ The plot below shows the instruction timing of the loop vs. number of inserted c
    <img src="16bitstore.png" alt="16 bit store" width="70%">
 </p>
 
+In combination with memory accesses, things get a bit more complicated. Since the GPIO and SRAM are on the same bus, the added memory access cycle cannot be hidden, and every instruction takes two cycles. It also appears that there is no prefetch when executing from SRAM. (I would have expected that two C.SW instructions take 3 cycles in total, but they take 4)
