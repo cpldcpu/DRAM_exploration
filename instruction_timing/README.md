@@ -48,7 +48,9 @@ The plot below shows the instruction timing of the loop vs. number of inserted 1
 
 First thing to note is that the bare loop without any additional instructions takes 4 cycles to execute in SRAM and 6 cycles in Flash. The CH32V003 uses a QinkeV2 RISC-V2A with a 2 step pipeline and static `branch prediction`. Although not explain further in the processes manual, experimentally this seems to imply that branches are assumed to be not-taken by default. For taken branches, the pipeline is flushed and two additional cycles are added to the execution time. 
 
-Accessing the Flash memory takes 2 additional cycles. It is not clear to me why, as I would have expected only one additional cycles due to the wait state. I am suspecting that it is not possible to abort the prefetch and all flash accesses are timed in steps of two cycles. This is also evident from the fact that the execution time of the loop is the same for 0 and 1 NOPs and 2/3 NOPs. 
+Accessing the Flash memory takes 2 additional cycles. This is surprising, as I would have expected only one additional cycles due to the wait state. I am suspecting that it is not possible to abort the prefetch and all flash accesses are timed in steps of two cycles. 
+
+This is also evident from the fact that the execution time of the loop is the same for 0 and 1 NOPs and 2/3 NOPs. 
 
 Therefore the added penalty for fetching from a new flash address is either 1 or 2 cycles, depending on whether it has completed the last fetch or not.
 
